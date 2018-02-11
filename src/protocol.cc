@@ -22,12 +22,14 @@ asterid::cicada::server::signal protocol_base::ready(asterid::cicada::connection
 	
 	asterid::cicada::server::signal sig;
 
-	if (con.read(work_in) < 0) {
-		sig.m = asterid::cicada::server::signal::mask::terminate;
-		return sig;
+	if (state_ != state::terminate_on_write) {
+		if (con.read(work_in) < 0) {
+			sig.m = asterid::cicada::server::signal::mask::terminate;
+			return sig;
+		}
+		
+		if (!work_in.size()) sig.m |= asterid::cicada::server::signal::mask::wait_for_read;
 	}
-	
-	if (!work_in.size()) sig.m |= asterid::cicada::server::signal::mask::wait_for_read;
 	
 	while (true) {
 		switch (state_) {
@@ -40,9 +42,9 @@ asterid::cicada::server::signal protocol_base::ready(asterid::cicada::connection
 						EBREAK
 					case http::request_header::parse_status::complete:
 						current_session = session();
-						current_session->process_header(req_head);
+						header_good = current_session->process_header(&req_head);
 						
-						if (req_head.field("Connection") == "Upgrade") {
+						if (req_head.field("Connection") == "Upgrade" && header_good) {
 							if (req_head.field("Upgrade") == "websocket") {
 								if (current_session->websocket_accept()) {
 									
@@ -74,7 +76,7 @@ asterid::cicada::server::signal protocol_base::ready(asterid::cicada::connection
 							}
 						}
 						
-						if (req_head.content_length())
+						if (req_head.content_length() && header_good)
 							begin_state(state::request_body_read);
 						else begin_state(state::response_process);
 						continue;
@@ -100,7 +102,7 @@ asterid::cicada::server::signal protocol_base::ready(asterid::cicada::connection
 				res_head.serialize(work_out);
 				if (res_body.size()) res_body.transfer_to(work_out);
 				
-				begin_state(state::request_header_read);
+				begin_state(header_good ? state::request_header_read : state::terminate_on_write);
 				continue;
 			}
 			case state::websocket_run: {
@@ -141,6 +143,8 @@ asterid::cicada::server::signal protocol_base::ready(asterid::cicada::connection
 				}
 				break;
 			}
+			case state::terminate_on_write:
+				break;
 		}
 		break;
 	}
@@ -154,6 +158,7 @@ asterid::cicada::server::signal protocol_base::ready(asterid::cicada::connection
 	} else {
 		if (con.write_consume(work_out) < 0) TBREAK
 		if (work_out.size()) sig.m |= asterid::cicada::server::signal::mask::wait_for_write;
+		else if (state_ == state::terminate_on_write) sig.m = asterid::cicada::server::signal::mask::terminate;
 	}
 	
 	return sig;
@@ -173,6 +178,8 @@ void protocol_base::begin_state(state s) {
 			break;
 		case state::websocket_run:
 			ws_frame.reset();
+			break;
+		case state::terminate_on_write:
 			break;
 	}
 }

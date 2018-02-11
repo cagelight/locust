@@ -178,7 +178,7 @@ namespace locust {
 	
 	struct exchange {
 		virtual ~exchange();
-		virtual void process_header(http::request_header const &) = 0;
+		virtual bool process_header(http::request_header const *) = 0;
 		virtual void body_segment(asterid::buffer_assembly const &) = 0;
 		virtual void process(http::response_header & header, asterid::buffer_assembly & body) = 0;
 		virtual bool websocket_accept() = 0;
@@ -189,7 +189,7 @@ namespace locust {
 	};
 	
 	struct dummy_exchange : public exchange {
-		virtual void process_header(http::request_header const &) override {  }
+		virtual bool process_header(http::request_header const *) override { return false; }
 		virtual void body_segment(asterid::buffer_assembly const &) override {  }
 		virtual void process(http::response_header & header, asterid::buffer_assembly & body) override {
 			body << "dummy";
@@ -266,7 +266,8 @@ namespace locust {
 			request_header_read,
 			request_body_read,
 			response_process,
-			websocket_run
+			websocket_run,
+			terminate_on_write
 		} state_ = state::request_header_read;
 		asterid::buffer_assembly work_in {};
 		asterid::buffer_assembly work_out {};
@@ -276,6 +277,7 @@ namespace locust {
 		websocket_frame ws_frame;
 		std::unique_ptr<exchange> current_session;
 		std::shared_ptr<websocket_interface> wsi;
+		bool header_good;
 		
 		void begin_state(state);
 		
