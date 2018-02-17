@@ -175,6 +175,7 @@ namespace locust {
 	}
 	
 	struct websocket_interface;
+	typedef std::shared_ptr<websocket_interface> wsi_ptr;
 	
 	struct exchange {
 		virtual ~exchange();
@@ -182,7 +183,7 @@ namespace locust {
 		virtual void body_segment(asterid::buffer_assembly const &) = 0;
 		virtual void process(http::response_header & header, asterid::buffer_assembly & body) = 0;
 		virtual bool websocket_accept() = 0;
-		virtual void websocket_handle(std::weak_ptr<websocket_interface>) = 0;
+		virtual void websocket_handle(wsi_ptr) = 0;
 		virtual void websocket_message(asterid::buffer_assembly const & data, bool text) = 0;
 		
 		std::shared_ptr<websocket_interface> websocket_interface_;
@@ -196,7 +197,7 @@ namespace locust {
 			header.fields["Content-Type"] = "text/plain";
 		}
 		virtual bool websocket_accept() override { return false; };
-		virtual void websocket_handle(std::weak_ptr<websocket_interface>) override { };
+		virtual void websocket_handle(wsi_ptr) override { };
 		virtual void websocket_message(asterid::buffer_assembly const &, bool) override {}
 	};
 	
