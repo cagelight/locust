@@ -293,6 +293,7 @@ namespace locust {
 	struct websocket_interface {
 		websocket_interface(protocol_base * parent) : parent(parent) {}
 		void send(std::string const &);
+		inline bool is_alive() { return alive; }
 	private:
 		protocol_base * parent;
 		std::atomic_bool alive {true};
