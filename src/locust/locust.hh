@@ -1,7 +1,7 @@
 #pragma once
 
 #include <asterid/cicada.hh>
-#include <asterid/strops.hh>
+#include <asterid/strop.hh>
 #include <asterid/istring.hh>
 
 #include <sstream>
@@ -199,6 +199,20 @@ namespace locust {
 		virtual bool websocket_accept() override { return false; };
 		virtual void websocket_handle(wsi_ptr) override { };
 		virtual void websocket_message(asterid::buffer_assembly const &, bool) override {}
+	};
+	
+	struct basic_exchange : public dummy_exchange {
+		virtual bool process_header(locust::http::request_header const * header) override {
+			req_head = header;
+			return true;
+		}
+		virtual void body_segment(asterid::buffer_assembly const & buf) override {
+			req_body << buf;
+		}
+		virtual void process(http::response_header & res_head, asterid::buffer_assembly & res_body) override = 0;
+		
+		http::request_header const * req_head;
+		asterid::buffer_assembly req_body;
 	};
 	
 	// ================================================================

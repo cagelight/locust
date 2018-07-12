@@ -167,5 +167,5 @@ void websocket_interface::send(std::string const & str) {
 	asterid::buffer_assembly obuf;
 	websocket_frame::create_msg(buf, true, obuf);
 	parent->work_out << obuf;
-	parent->set_mask(asterid::cicada::server::signal::mask::wait_for_write);
+	parent->set_mask(asterid::cicada::server::signal::mask::wait_for_write | asterid::cicada::server::signal::mask::wait_for_read);
 }

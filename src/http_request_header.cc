@@ -40,12 +40,12 @@ http::request_header::parse_status http::request_header::parse(asterid::buffer_a
 	path = asterid::buffer_assembly(ws, we).to_string();
 	
 	if (!path.size()) return parse_status::invalid;
-	std::vector<std::string> path_argsplit = asterid::strop::separate(path, '?', 1);
+	std::vector<std::string> path_argsplit = asterid::separate(path, '?', 1);
 	path = path_argsplit[0];
 	if (path_argsplit.size() != 1) {
-		std::vector<std::string> args = asterid::strop::separate(path_argsplit[1], '&');
+		std::vector<std::string> args = asterid::separate(path_argsplit[1], '&');
 		for (std::string argset : args) {
-			std::vector<std::string> arg = asterid::strop::separate(argset, '=', 1);
+			std::vector<std::string> arg = asterid::separate(argset, '=', 1);
 			if (arg.size() != 2) continue;
 			this->args[arg[0]] = arg[1];
 		}

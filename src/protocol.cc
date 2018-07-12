@@ -98,7 +98,7 @@ asterid::cicada::server::signal protocol_base::ready(asterid::cicada::connection
 				asterid::buffer_assembly res_body {};
 				current_session->process(res_head, res_body);
 				res_head.fields["Content-Length"] = std::to_string(res_body.size());
-				res_head.fields["Server"] = "asterid::cicada/locust";
+				res_head.fields["Server"] = "locust";
 				res_head.serialize(work_out);
 				if (res_body.size()) res_body.transfer_to(work_out);
 				
