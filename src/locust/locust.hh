@@ -10,8 +10,6 @@
 
 namespace locust {
 	
-	struct exchange;
-	
 	namespace http {
 	
 		typedef std::unordered_map<asterid::istring, std::string> field_map;
@@ -174,47 +172,6 @@ namespace locust {
 	
 	}
 	
-	struct websocket_interface;
-	typedef std::shared_ptr<websocket_interface> wsi_ptr;
-	
-	struct exchange {
-		virtual ~exchange();
-		virtual bool process_header(http::request_header const *) = 0;
-		virtual void body_segment(asterid::buffer_assembly const &) = 0;
-		virtual void process(http::response_header & header, asterid::buffer_assembly & body) = 0;
-		virtual bool websocket_accept() = 0;
-		virtual void websocket_handle(wsi_ptr) = 0;
-		virtual void websocket_message(asterid::buffer_assembly const & data, bool text) = 0;
-		
-		std::shared_ptr<websocket_interface> websocket_interface_;
-	};
-	
-	struct dummy_exchange : public exchange {
-		virtual bool process_header(http::request_header const *) override { return false; }
-		virtual void body_segment(asterid::buffer_assembly const &) override {  }
-		virtual void process(http::response_header & header, asterid::buffer_assembly & body) override {
-			body << "dummy";
-			header.fields["Content-Type"] = "text/plain";
-		}
-		virtual bool websocket_accept() override { return false; };
-		virtual void websocket_handle(wsi_ptr) override { };
-		virtual void websocket_message(asterid::buffer_assembly const &, bool) override {}
-	};
-	
-	struct basic_exchange : public dummy_exchange {
-		virtual bool process_header(locust::http::request_header const * header) override {
-			req_head = header;
-			return true;
-		}
-		virtual void body_segment(asterid::buffer_assembly const & buf) override {
-			req_body << buf;
-		}
-		virtual void process(http::response_header & res_head, asterid::buffer_assembly & res_body) override = 0;
-		
-		http::request_header const * req_head;
-		asterid::buffer_assembly req_body;
-	};
-	
 	// ================================================================
 	// ----------------------------------------------------------------
 	// ================================================================
@@ -271,11 +228,52 @@ namespace locust {
 	// ----------------------------------------------------------------
 	// ================================================================
 	
-	struct protocol_base : public asterid::cicada::server::protocol {
-		virtual ~protocol_base() = default;
-		asterid::cicada::server::signal ready(asterid::cicada::connection & con, asterid::cicada::server::detail const & d) override final;
+	struct server_websocket_interface;
+	typedef std::shared_ptr<server_websocket_interface> sv_wsi_ptr;
+	
+	struct server_exchange {
+		virtual ~server_exchange();
+		virtual bool process_header(http::request_header const *) = 0;
+		virtual void body_segment(asterid::buffer_assembly const &) = 0;
+		virtual void process(http::response_header & header, asterid::buffer_assembly & body) = 0;
+		virtual bool websocket_accept() = 0;
+		virtual void websocket_handle(sv_wsi_ptr) = 0;
+		virtual void websocket_message(asterid::buffer_assembly const & data, bool text) = 0;
+		
+		std::shared_ptr<server_websocket_interface> websocket_interface_;
+	};
+	
+	struct dummy_exchange : public server_exchange {
+		virtual bool process_header(http::request_header const *) override { return false; }
+		virtual void body_segment(asterid::buffer_assembly const &) override {  }
+		virtual void process(http::response_header & header, asterid::buffer_assembly & body) override {
+			body << "dummy";
+			header.fields["Content-Type"] = "text/plain";
+		}
+		virtual bool websocket_accept() override { return false; };
+		virtual void websocket_handle(sv_wsi_ptr) override { };
+		virtual void websocket_message(asterid::buffer_assembly const &, bool) override {}
+	};
+	
+	struct basic_exchange : public dummy_exchange {
+		virtual bool process_header(locust::http::request_header const * header) override {
+			req_head = header;
+			return true;
+		}
+		virtual void body_segment(asterid::buffer_assembly const & buf) override {
+			req_body << buf;
+		}
+		virtual void process(http::response_header & res_head, asterid::buffer_assembly & res_body) override = 0;
+		
+		http::request_header const * req_head;
+		asterid::buffer_assembly req_body;
+	};
+	
+	struct server_protocol_base : public asterid::cicada::reactor::protocol {
+		virtual ~server_protocol_base() = default;
+		asterid::cicada::reactor::signal ready(asterid::cicada::connection & con, asterid::cicada::reactor::detail const & d) override final;
 	protected:
-		virtual std::unique_ptr<exchange> session() = 0;
+		virtual std::unique_ptr<server_exchange> session() = 0;
 	private:
 		enum struct state {
 			request_header_read,
@@ -290,31 +288,71 @@ namespace locust {
 		http::request_header req_head;
 		http::response_header res_head;
 		websocket_frame ws_frame;
-		std::unique_ptr<exchange> current_session;
-		std::shared_ptr<websocket_interface> wsi;
+		std::unique_ptr<server_exchange> current_session;
+		std::shared_ptr<server_websocket_interface> wsi;
 		bool header_good;
 		
 		void begin_state(state);
 		
-		friend websocket_interface;
+		friend server_websocket_interface;
 	};
 	
-	template <typename T> struct protocol : public protocol_base {
+	template <typename T> struct server_protocol : public server_protocol_base {
 	protected:
-		virtual std::unique_ptr<exchange> session() override { return std::unique_ptr<exchange> { new T {} }; }
+		virtual std::unique_ptr<server_exchange> session() override { return std::unique_ptr<server_exchange> { new T {} }; }
 	};
 	
-	struct websocket_interface {
-		websocket_interface(protocol_base * parent) : parent(parent) {}
+	struct server_websocket_interface {
+		server_websocket_interface(server_protocol_base * parent) : parent(parent) {}
 		void send(std::string const &);
 		inline bool is_alive() { return alive; }
 	private:
-		protocol_base * parent;
+		server_protocol_base * parent;
 		std::atomic_bool alive {true};
 		std::mutex lk;
 		
-	friend exchange;
-	friend protocol_base;
+	friend server_exchange;
+	friend server_protocol_base;
+	};
+	
+	// ================================================================
+	// ----------------------------------------------------------------
+	// ================================================================
+	
+	struct client_exchange {
+		virtual ~client_exchange();
+		virtual void process(http::request_header & header, asterid::buffer_assembly & body) = 0;
+		virtual bool process_header(http::response_header const *) = 0;
+		virtual void body_segment(asterid::buffer_assembly const &) = 0;
+		/*
+		virtual bool websocket_connect() = 0;
+		virtual void websocket_handle(sv_wsi_ptr) = 0;
+		virtual void websocket_message(asterid::buffer_assembly const & data, bool text) = 0;
+		
+		std::shared_ptr<server_websocket_interface> websocket_interface_;
+		*/
+	};
+	
+	struct client_protocol_base : public asterid::cicada::reactor::protocol {
+		virtual ~client_protocol_base() = default;
+		asterid::cicada::reactor::signal ready(asterid::cicada::connection & con, asterid::cicada::reactor::detail const & d) override final;
+	protected:
+		virtual std::unique_ptr<client_exchange> session() = 0;
+	private:
+		enum struct state {
+			request_process,
+			response_header_read,
+			response_body_read,
+			//websocket_run,
+			terminate
+		} state_ = state::request_process;
+		asterid::buffer_assembly work_in {};
+		asterid::buffer_assembly work_out {};
+		http::request_header req_head;
+		http::response_header res_head;
+		ssize_t read_counter = 0;
+		
+		void begin_state(state);
 	};
 	
 }

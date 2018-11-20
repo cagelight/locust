@@ -8,27 +8,27 @@ using namespace locust;
 static std::unique_ptr<Botan::HashFunction> hash_sha1 { Botan::HashFunction::create("SHA-1") };
 static std::mutex hash_lk;
 
-#define TBREAK { sig.m = asterid::cicada::server::signal::mask::terminate; return sig; }
+#define TBREAK { sig.m = asterid::cicada::reactor::signal::mask::terminate; return sig; }
 #define EBREAK goto end;
 
-exchange::~exchange() {
+server_exchange::~server_exchange() {
 	if (websocket_interface_) {
 		std::lock_guard<std::mutex> lkg(websocket_interface_->lk);
 		websocket_interface_->alive.store(false);
 	}
 }
 
-asterid::cicada::server::signal protocol_base::ready(asterid::cicada::connection & con, asterid::cicada::server::detail const &) {
+asterid::cicada::reactor::signal server_protocol_base::ready(asterid::cicada::connection & con, asterid::cicada::reactor::detail const &) {
 	
-	asterid::cicada::server::signal sig;
+	asterid::cicada::reactor::signal sig;
 
 	if (state_ != state::terminate_on_write) {
 		if (con.read(work_in) < 0) {
-			sig.m = asterid::cicada::server::signal::mask::terminate;
+			sig.m = asterid::cicada::reactor::signal::mask::terminate;
 			return sig;
 		}
 		
-		if (!work_in.size()) sig.m |= asterid::cicada::server::signal::mask::wait_for_read;
+		if (!work_in.size()) sig.m |= asterid::cicada::reactor::signal::mask::wait_for_read;
 	}
 	
 	while (true) {
@@ -38,7 +38,7 @@ asterid::cicada::server::signal protocol_base::ready(asterid::cicada::connection
 					case http::request_header::parse_status::invalid:
 						TBREAK
 					case http::request_header::parse_status::incomplete:
-						sig.m |= asterid::cicada::server::signal::mask::wait_for_read;
+						sig.m |= asterid::cicada::reactor::signal::mask::wait_for_read;
 						EBREAK
 					case http::request_header::parse_status::complete:
 						current_session = session();
@@ -54,7 +54,7 @@ asterid::cicada::server::signal protocol_base::ready(asterid::cicada::connection
 									res_head.fields["Connection"] = std::string("Upgrade");
 									res_head.fields["Upgrade"] = "websocket";
 									
-									current_session->websocket_interface_.reset(new websocket_interface {this});
+									current_session->websocket_interface_.reset(new server_websocket_interface {this});
 									
 									std::string const & key = req_head.field("Sec-WebSocket-Key");
 									if (!key.empty()) {
@@ -88,7 +88,7 @@ asterid::cicada::server::signal protocol_base::ready(asterid::cicada::connection
 				read_counter -= work_in.transfer_to(segment, read_counter);
 				current_session->body_segment(segment);
 				if (read_counter > 0) {
-					sig.m |= asterid::cicada::server::signal::mask::wait_for_read;
+					sig.m |= asterid::cicada::reactor::signal::mask::wait_for_read;
 					EBREAK
 				}
 				begin_state(state::response_process);
@@ -106,7 +106,7 @@ asterid::cicada::server::signal protocol_base::ready(asterid::cicada::connection
 				continue;
 			}
 			case state::websocket_run: {
-				sig.m = asterid::cicada::server::signal::mask::wait_for_read;
+				sig.m = asterid::cicada::reactor::signal::mask::wait_for_read;
 				switch (ws_frame.parse(work_in)) {
 					case websocket_frame::parse_status::invalid:
 						TBREAK
@@ -154,17 +154,17 @@ asterid::cicada::server::signal protocol_base::ready(asterid::cicada::connection
 	if (state_ == state::websocket_run) {
 		std::lock_guard<std::mutex> lkg { current_session->websocket_interface_->lk };
 		if (con.write_consume(work_out) < 0) TBREAK
-		if (work_out.size()) sig.m |= asterid::cicada::server::signal::mask::wait_for_write;
+		if (work_out.size()) sig.m |= asterid::cicada::reactor::signal::mask::wait_for_write;
 	} else {
 		if (con.write_consume(work_out) < 0) TBREAK
-		if (work_out.size()) sig.m |= asterid::cicada::server::signal::mask::wait_for_write;
-		else if (state_ == state::terminate_on_write) sig.m = asterid::cicada::server::signal::mask::terminate;
+		if (work_out.size()) sig.m |= asterid::cicada::reactor::signal::mask::wait_for_write;
+		else if (state_ == state::terminate_on_write) sig.m = asterid::cicada::reactor::signal::mask::terminate;
 	}
 	
 	return sig;
 }
 
-void protocol_base::begin_state(state s) {
+void server_protocol_base::begin_state(state s) {
 	state_ = s;
 	switch (state_) {
 		case state::request_header_read:

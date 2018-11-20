@@ -159,7 +159,7 @@ websocket_frame::parse_status websocket_frame::parse(asterid::buffer_assembly & 
 	return parse_status::invalid;
 }
 
-void websocket_interface::send(std::string const & str) {
+void server_websocket_interface::send(std::string const & str) {
 	std::lock_guard<std::mutex> lkg(lk);
 	if (!alive) return;
 	asterid::buffer_assembly buf;
@@ -167,5 +167,5 @@ void websocket_interface::send(std::string const & str) {
 	asterid::buffer_assembly obuf;
 	websocket_frame::create_msg(buf, true, obuf);
 	parent->work_out << obuf;
-	parent->set_mask(asterid::cicada::server::signal::mask::wait_for_write | asterid::cicada::server::signal::mask::wait_for_read);
+	parent->set_mask(asterid::cicada::reactor::signal::mask::wait_for_write | asterid::cicada::reactor::signal::mask::wait_for_read);
 }
