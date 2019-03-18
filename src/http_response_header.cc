@@ -2,7 +2,7 @@
 
 using namespace locust;
 
-void http::response_header::serialize(asterid::buffer_assembly & buf) {
+void http::response_header::serialize(asterales::buffer_assembly & buf) {
 	
 	buf << "HTTP/1.1 ";
 	buf << std::to_string(static_cast<uint_fast16_t>(code)) << " " << status_text(code);

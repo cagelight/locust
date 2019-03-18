@@ -26,7 +26,7 @@ def configure(ctx):
 	ctx.load("g++")
 	ctx.check(features='c cprogram', lib='pthread', uselib_store='PTHREAD')
 	ctx.check(features='c cprogram', lib='dl', uselib_store='DL')
-	ctx.check(features='c cprogram', lib='asterid', uselib_store='ASTERID')
+	ctx.check(features='c cprogram', lib='asterales', uselib_store='ASTERALES')
 	ctx.check_cfg(path='pkg-config', args='--cflags --libs', package='botan-2', uselib_store='BOTAN')
 	btup = ctx.options.build_type.upper()
 	if btup in ["DEBUG", "NATIVE", "RELEASE"]:
@@ -35,7 +35,9 @@ def configure(ctx):
 		ctx.env.CXXFLAGS = btype_cflags(ctx)
 		Logs.pprint("PINK", "CXXFLAGS: " + ' '.join(ctx.env.CXXFLAGS))
 		if btup == "DEBUG":
-			ctx.define("LOCUST_DEBUG", 1)
+			ctx.define("DEBUG", 1)
+		else:
+			ctx.define("NDEBUG", 1)
 	else:
 		Logs.error("UNKNOWN BUILD TYPE: " + btup)
 		
@@ -49,6 +51,7 @@ def build(bld):
 		features = "cxx cxxshlib",
 		target = coreprog_name,
 		source = bld_files,
-		uselib = ['PTHREAD', 'DL', 'ASTERID', 'BOTAN'],
+		uselib = ['PTHREAD', 'DL', 'ASTERALES', 'BOTAN'],
 		includes = [os.path.join(top, 'src')],
+		vnum = '0.0.1'
 	)

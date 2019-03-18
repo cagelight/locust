@@ -1,8 +1,8 @@
 #pragma once
 
-#include <asterid/cicada.hh>
-#include <asterid/strop.hh>
-#include <asterid/istring.hh>
+#include <asterales/cicada.hh>
+#include <asterales/strop.hh>
+#include <asterales/istring.hh>
 
 #include <sstream>
 #include <string_view>
@@ -12,7 +12,7 @@ namespace locust {
 	
 	namespace http {
 	
-		typedef std::unordered_map<asterid::istring, std::string> field_map;
+		typedef std::unordered_map<asterales::istring, std::string> field_map;
 		typedef std::unordered_map<std::string, std::string> arg_map;
 		typedef std::unordered_map<std::string, std::string> cookie_map;
 		
@@ -110,26 +110,26 @@ namespace locust {
 			
 			request_header() = default;
 			
-			parse_status parse(asterid::buffer_assembly & buf); // will consume from buffer if complete, otherwise does not consume
-			void serialize(asterid::buffer_assembly & buf); // append to end
+			parse_status parse(asterales::buffer_assembly & buf); // will consume from buffer if complete, otherwise does not consume
+			void serialize(asterales::buffer_assembly & buf); // append to end
 			void clear();
 			
-			inline std::string const & field(asterid::istring const & f) const {
+			inline std::string const & field(asterales::istring const & f) const {
 				auto i = fields.find(f);
 				if (i != fields.end()) return i->second;
-				return asterid::empty_str;
+				return asterales::empty_str;
 			}
 			
 			inline std::string const & argument(std::string const & f) const {
 				auto i = args.find(f);
 				if (i != args.end()) return i->second;
-				return asterid::empty_str;
+				return asterales::empty_str;
 			}
 
 			inline std::string const & cookie(std::string const & f) const {
 				auto i = cookies.find(f);
 				if (i != cookies.end()) return i->second;
-				return asterid::empty_str;
+				return asterales::empty_str;
 			}
 			
 			inline size_t content_length() const {
@@ -150,13 +150,13 @@ namespace locust {
 			
 			response_header() = default;
 			
-			void serialize(asterid::buffer_assembly & buf); // append to end
+			void serialize(asterales::buffer_assembly & buf); // append to end
 			void clear();
 			
-			inline std::string const & field(asterid::istring const & f) const {
+			inline std::string const & field(asterales::istring const & f) const {
 				auto i = fields.find(f);
 				if (i != fields.end()) return i->second;
-				return asterid::empty_str;
+				return asterales::empty_str;
 			}
 			
 			inline size_t content_length() const {
@@ -195,15 +195,15 @@ namespace locust {
 			invalid
 		};
 		
-		parse_status parse(asterid::buffer_assembly & buf);
+		parse_status parse(asterales::buffer_assembly & buf);
 		void reset();
 		
-		asterid::buffer_assembly const & body() const { return bodybuf; }
+		asterales::buffer_assembly const & body() const { return bodybuf; }
 		opcode op() const { return opcode_; }
 		
-		static void create_ping(asterid::buffer_assembly & out_buffer);
-		static void create_pong(asterid::buffer_assembly const & body, asterid::buffer_assembly & out_buffer);
-		static void create_msg(asterid::buffer_assembly const & body, bool is_text, asterid::buffer_assembly & out_buffer);
+		static void create_ping(asterales::buffer_assembly & out_buffer);
+		static void create_pong(asterales::buffer_assembly const & body, asterales::buffer_assembly & out_buffer);
+		static void create_msg(asterales::buffer_assembly const & body, bool is_text, asterales::buffer_assembly & out_buffer);
 		
 	private:
 		
@@ -215,7 +215,7 @@ namespace locust {
 			done
 		} parse_state_;
 		
-		asterid::buffer_assembly workbuf, bodybuf;
+		asterales::buffer_assembly workbuf, bodybuf;
 		bool fin;
 		opcode opcode_;
 		size_t payload_length;
@@ -234,25 +234,25 @@ namespace locust {
 	struct server_exchange {
 		virtual ~server_exchange();
 		virtual bool process_header(http::request_header const *) = 0;
-		virtual void body_segment(asterid::buffer_assembly const &) = 0;
-		virtual void process(http::response_header & header, asterid::buffer_assembly & body) = 0;
+		virtual void body_segment(asterales::buffer_assembly const &) = 0;
+		virtual void process(http::response_header & header, asterales::buffer_assembly & body) = 0;
 		virtual bool websocket_accept() = 0;
 		virtual void websocket_handle(sv_wsi_ptr) = 0;
-		virtual void websocket_message(asterid::buffer_assembly const & data, bool text) = 0;
+		virtual void websocket_message(asterales::buffer_assembly const & data, bool text) = 0;
 		
 		std::shared_ptr<server_websocket_interface> websocket_interface_;
 	};
 	
 	struct dummy_exchange : public server_exchange {
 		virtual bool process_header(http::request_header const *) override { return false; }
-		virtual void body_segment(asterid::buffer_assembly const &) override {  }
-		virtual void process(http::response_header & header, asterid::buffer_assembly & body) override {
+		virtual void body_segment(asterales::buffer_assembly const &) override {  }
+		virtual void process(http::response_header & header, asterales::buffer_assembly & body) override {
 			body << "dummy";
 			header.fields["Content-Type"] = "text/plain";
 		}
 		virtual bool websocket_accept() override { return false; };
 		virtual void websocket_handle(sv_wsi_ptr) override { };
-		virtual void websocket_message(asterid::buffer_assembly const &, bool) override {}
+		virtual void websocket_message(asterales::buffer_assembly const &, bool) override {}
 	};
 	
 	struct basic_exchange : public dummy_exchange {
@@ -260,18 +260,18 @@ namespace locust {
 			req_head = header;
 			return true;
 		}
-		virtual void body_segment(asterid::buffer_assembly const & buf) override {
+		virtual void body_segment(asterales::buffer_assembly const & buf) override {
 			req_body << buf;
 		}
-		virtual void process(http::response_header & res_head, asterid::buffer_assembly & res_body) override = 0;
+		virtual void process(http::response_header & res_head, asterales::buffer_assembly & res_body) override = 0;
 		
 		http::request_header const * req_head;
-		asterid::buffer_assembly req_body;
+		asterales::buffer_assembly req_body;
 	};
 	
-	struct server_protocol_base : public asterid::cicada::reactor::protocol {
+	struct server_protocol_base : public asterales::cicada::reactor::protocol {
 		virtual ~server_protocol_base() = default;
-		asterid::cicada::reactor::signal ready(asterid::cicada::connection & con, asterid::cicada::reactor::detail const & d) override final;
+		asterales::cicada::reactor::signal ready(asterales::cicada::connection & con, asterales::cicada::reactor::detail const & d) override final;
 	protected:
 		virtual std::unique_ptr<server_exchange> session() = 0;
 	private:
@@ -282,8 +282,8 @@ namespace locust {
 			websocket_run,
 			terminate_on_write
 		} state_ = state::request_header_read;
-		asterid::buffer_assembly work_in {};
-		asterid::buffer_assembly work_out {};
+		asterales::buffer_assembly work_in {};
+		asterales::buffer_assembly work_out {};
 		ssize_t read_counter = 0;
 		http::request_header req_head;
 		http::response_header res_head;
@@ -321,21 +321,21 @@ namespace locust {
 	
 	struct client_exchange {
 		virtual ~client_exchange();
-		virtual void process(http::request_header & header, asterid::buffer_assembly & body) = 0;
+		virtual void process(http::request_header & header, asterales::buffer_assembly & body) = 0;
 		virtual bool process_header(http::response_header const *) = 0;
-		virtual void body_segment(asterid::buffer_assembly const &) = 0;
+		virtual void body_segment(asterales::buffer_assembly const &) = 0;
 		/*
 		virtual bool websocket_connect() = 0;
 		virtual void websocket_handle(sv_wsi_ptr) = 0;
-		virtual void websocket_message(asterid::buffer_assembly const & data, bool text) = 0;
+		virtual void websocket_message(asterales::buffer_assembly const & data, bool text) = 0;
 		
 		std::shared_ptr<server_websocket_interface> websocket_interface_;
 		*/
 	};
 	
-	struct client_protocol_base : public asterid::cicada::reactor::protocol {
+	struct client_protocol_base : public asterales::cicada::reactor::protocol {
 		virtual ~client_protocol_base() = default;
-		asterid::cicada::reactor::signal ready(asterid::cicada::connection & con, asterid::cicada::reactor::detail const & d) override final;
+		asterales::cicada::reactor::signal ready(asterales::cicada::connection & con, asterales::cicada::reactor::detail const & d) override final;
 	protected:
 		virtual std::unique_ptr<client_exchange> session() = 0;
 	private:
@@ -346,8 +346,8 @@ namespace locust {
 			//websocket_run,
 			terminate
 		} state_ = state::request_process;
-		asterid::buffer_assembly work_in {};
-		asterid::buffer_assembly work_out {};
+		asterales::buffer_assembly work_in {};
+		asterales::buffer_assembly work_out {};
 		http::request_header req_head;
 		http::response_header res_head;
 		ssize_t read_counter = 0;

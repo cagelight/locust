@@ -29,7 +29,7 @@ void websocket_frame::reset() {
 	mask = 0;
 }
 
-void websocket_frame::create_ping(asterid::buffer_assembly & out_buffer) {
+void websocket_frame::create_ping(asterales::buffer_assembly & out_buffer) {
 	byte_1 b1;
 	byte_2 b2;
 	
@@ -52,7 +52,7 @@ void websocket_frame::create_ping(asterid::buffer_assembly & out_buffer) {
 	out_buffer.write(dat.data(), 32);
 }
 
-void websocket_frame::create_pong(asterid::buffer_assembly const & body, asterid::buffer_assembly & out_buffer) {
+void websocket_frame::create_pong(asterales::buffer_assembly const & body, asterales::buffer_assembly & out_buffer) {
 	byte_1 b1;
 	byte_2 b2;
 	
@@ -71,7 +71,7 @@ void websocket_frame::create_pong(asterid::buffer_assembly const & body, asterid
 	out_buffer << body;
 }
 
-void websocket_frame::create_msg(asterid::buffer_assembly const & body, bool is_text, asterid::buffer_assembly & out_buffer) {
+void websocket_frame::create_msg(asterales::buffer_assembly const & body, bool is_text, asterales::buffer_assembly & out_buffer) {
 	byte_1 b1;
 	byte_2 b2;
 	
@@ -102,7 +102,7 @@ void websocket_frame::create_msg(asterid::buffer_assembly const & body, bool is_
 	out_buffer << body;
 }
 
-websocket_frame::parse_status websocket_frame::parse(asterid::buffer_assembly & buf) {
+websocket_frame::parse_status websocket_frame::parse(asterales::buffer_assembly & buf) {
 	
 	switch (parse_state_) {
 		case parse_state::first_2: {
@@ -162,10 +162,10 @@ websocket_frame::parse_status websocket_frame::parse(asterid::buffer_assembly & 
 void server_websocket_interface::send(std::string const & str) {
 	std::lock_guard<std::mutex> lkg(lk);
 	if (!alive) return;
-	asterid::buffer_assembly buf;
+	asterales::buffer_assembly buf;
 	buf << str;
-	asterid::buffer_assembly obuf;
+	asterales::buffer_assembly obuf;
 	websocket_frame::create_msg(buf, true, obuf);
 	parent->work_out << obuf;
-	parent->set_mask(asterid::cicada::reactor::signal::mask::wait_for_write | asterid::cicada::reactor::signal::mask::wait_for_read);
+	parent->set_mask(asterales::cicada::reactor::signal::mask::wait_for_write | asterales::cicada::reactor::signal::mask::wait_for_read);
 }
